@@ -8,6 +8,8 @@ main:
         assign:
           - order: ${input.order}
           - order_id: ${order.order_id}
+          - shipping_estimate: {}
+          - tax_calculation: {}
     
     # Step 1: Validate Order
     - validate_order:
