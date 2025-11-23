@@ -211,6 +211,7 @@ admissionWhitelistPatterns:
 defaultAdmissionRule:
   requireAttestationsBy:
   - projects/${PROJECT_ID}/attestors/${ATTESTOR_NAME}
+  evaluationMode: REQUIRE_ATTESTATION
   enforcementMode: ENFORCED_BLOCK_AND_AUDIT_LOG
 name: projects/${PROJECT_ID}/policy
 EOF
