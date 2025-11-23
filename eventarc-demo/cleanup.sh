@@ -49,10 +49,8 @@ echo ""
 # Delete Cloud Storage bucket
 echo "3. Deleting Cloud Storage bucket..."
 if [ -n "$BUCKET_NAME" ] && gsutil ls gs://${BUCKET_NAME} 2>/dev/null; then
-  echo "  Deleting all objects in bucket..."
-  gsutil -m rm -r gs://${BUCKET_NAME}/* 2>/dev/null || true
-  echo "  Deleting bucket..."
-  gsutil rb gs://${BUCKET_NAME}
+  echo "  Removing bucket (this will delete all objects)..."
+  gsutil -m rb -f gs://${BUCKET_NAME}
   echo "✓ Bucket deleted"
 else
   echo "Bucket not found or bucket name not set, skipping"
