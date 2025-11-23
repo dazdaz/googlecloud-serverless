@@ -117,12 +117,24 @@ echo ""
 
 # Create Eventarc trigger for Cloud Storage events
 # This will automatically create the Eventarc service account and set up permissions
-echo "4. Creating Eventarc trigger..."
+echo "4. Setting up IAM permissions for Eventarc..."
+
+# Grant Cloud Storage service agent permission to publish to Pub/Sub
+GCS_SA="service-${PROJECT_NUMBER}@gs-project-accounts.iam.gserviceaccount.com"
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+  --member="serviceAccount:${GCS_SA}" \
+  --role="roles/pubsub.publisher" \
+  --quiet 2>/dev/null || echo "Note: GCS service agent already has pubsub.publisher role"
+
+echo "✓ Cloud Storage service agent configured"
+echo ""
+
+echo "5. Creating Eventarc trigger..."
 echo "   (This may take a few minutes...)"
 echo "   Note: This will automatically create the Eventarc service account and configure permissions"
 echo ""
 
-# First, grant the default Compute Engine service account permission to invoke the service
+# Grant the default Compute Engine service account permission to invoke the service
 # This is needed for Eventarc to work properly
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 gcloud run services add-iam-policy-binding ${SERVICE_NAME} \
@@ -145,7 +157,7 @@ echo "✓ Eventarc trigger created"
 echo ""
 
 # Now grant permissions to the Eventarc service account (created by the trigger)
-echo "5. Configuring IAM permissions..."
+echo "6. Configuring final IAM permissions..."
 EVENTARC_SA="service-${PROJECT_NUMBER}@gcp-sa-eventarc.iam.gserviceaccount.com"
 
 # Grant eventarc.eventReceiver role to invoke Cloud Run
