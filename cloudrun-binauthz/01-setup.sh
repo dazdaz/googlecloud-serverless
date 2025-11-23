@@ -172,8 +172,10 @@ NOTE_ID="${ATTESTOR_NAME}"
 NOTE_URI="projects/${PROJECT_ID}/notes/${NOTE_ID}"
 
 # Check if note exists
-if curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-  "https://containeranalysis.googleapis.com/v1/${NOTE_URI}" | grep -q "name"; then
+NOTE_CHECK=$(curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://containeranalysis.googleapis.com/v1/${NOTE_URI}" 2>/dev/null)
+
+if echo "$NOTE_CHECK" | grep -q "name"; then
   echo "Note already exists"
 else
   # Create the note
@@ -188,15 +190,26 @@ else
 }
 EOF
 
-  curl -X POST \
+  echo "Creating note..."
+  RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $(gcloud auth print-access-token)" \
     --data-binary @/tmp/note_payload.json \
-    "https://containeranalysis.googleapis.com/v1/projects/${PROJECT_ID}/notes/?noteId=${NOTE_ID}" \
-    > /dev/null 2>&1
+    "https://containeranalysis.googleapis.com/v1/projects/${PROJECT_ID}/notes/?noteId=${NOTE_ID}")
+  
+  HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+  BODY=$(echo "$RESPONSE" | sed '$d')
+  
+  if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+    echo "✓ Container Analysis note created"
+  else
+    echo "Failed to create note. HTTP code: $HTTP_CODE"
+    echo "Response: $BODY"
+    rm /tmp/note_payload.json
+    exit 1
+  fi
   
   rm /tmp/note_payload.json
-  echo "✓ Container Analysis note created"
 fi
 echo ""
 
