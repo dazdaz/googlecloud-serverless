@@ -29,10 +29,15 @@ echo ""
 # Build and push container image
 echo "2. Building container image..."
 echo "   This may take a few minutes..."
-gcloud builds submit ./app \
-  --tag=${IMAGE_URL}:latest \
-  --quiet
+echo ""
+echo "Running command:"
+echo "  gcloud builds submit ./app --tag=${IMAGE_URL}:latest"
+echo ""
 
+gcloud builds submit ./app \
+  --tag=${IMAGE_URL}:latest
+
+echo ""
 echo "✓ Image built and pushed"
 echo ""
 
@@ -49,6 +54,18 @@ echo ""
 # Create attestation
 echo "4. Creating attestation (signing the image)..."
 echo "   This cryptographically signs the container image..."
+echo ""
+echo "Running command:"
+echo "  gcloud beta container binauthz attestations sign-and-create \\"
+echo "    --artifact-url=\"${IMAGE_URL_WITH_DIGEST}\" \\"
+echo "    --attestor=\"${ATTESTOR_NAME}\" \\"
+echo "    --attestor-project=\"${PROJECT_ID}\" \\"
+echo "    --keyversion-project=\"${PROJECT_ID}\" \\"
+echo "    --keyversion-location=\"${REGION}\" \\"
+echo "    --keyversion-keyring=\"${KEYRING_NAME}\" \\"
+echo "    --keyversion-key=\"${KEY_NAME}\" \\"
+echo "    --keyversion=\"1\""
+echo ""
 
 # The attestation proves that this specific image digest was verified
 gcloud beta container binauthz attestations sign-and-create \
@@ -59,24 +76,33 @@ gcloud beta container binauthz attestations sign-and-create \
   --keyversion-location="${REGION}" \
   --keyversion-keyring="${KEYRING_NAME}" \
   --keyversion-key="${KEY_NAME}" \
-  --keyversion="1" \
-  --quiet
+  --keyversion="1"
 
+echo ""
 echo "✓ Attestation created"
 echo ""
 
 # Deploy to Cloud Run with Binary Authorization
 echo "5. Deploying to Cloud Run..."
 echo "   Binary Authorization will verify the attestation..."
+echo ""
+echo "Running command:"
+echo "  gcloud run deploy ${SERVICE_NAME} \\"
+echo "    --image=\"${IMAGE_URL_WITH_DIGEST}\" \\"
+echo "    --platform=managed \\"
+echo "    --region=${REGION} \\"
+echo "    --allow-unauthenticated \\"
+echo "    --binary-authorization=default"
+echo ""
 
 gcloud run deploy ${SERVICE_NAME} \
   --image="${IMAGE_URL_WITH_DIGEST}" \
   --platform=managed \
   --region=${REGION} \
   --allow-unauthenticated \
-  --binary-authorization=default \
-  --quiet
+  --binary-authorization=default
 
+echo ""
 echo "✓ Deployment successful!"
 echo ""
 

@@ -92,15 +92,23 @@ echo ""
 
 # Enable required APIs
 echo "1. Enabling required APIs..."
+echo "   - binaryauthorization.googleapis.com"
+echo "   - containeranalysis.googleapis.com"
+echo "   - run.googleapis.com"
+echo "   - cloudbuild.googleapis.com"
+echo "   - artifactregistry.googleapis.com"
+echo "   - cloudkms.googleapis.com"
+echo ""
+
 gcloud services enable \
   binaryauthorization.googleapis.com \
   containeranalysis.googleapis.com \
   run.googleapis.com \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com \
-  cloudkms.googleapis.com \
-  --quiet
+  cloudkms.googleapis.com
 
+echo ""
 echo "✓ APIs enabled"
 echo ""
 
