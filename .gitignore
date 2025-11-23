@@ -43,6 +43,11 @@ wheels/
 .env
 .env.local
 .env.*.local
+*.env
+
+# Demo configuration files
+config.env
+api-endpoints.env
 
 # GCP
 .gcloud/
