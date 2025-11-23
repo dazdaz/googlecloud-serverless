@@ -12,7 +12,7 @@ echo ""
 
 # Load configuration
 if [ ! -f config.env ]; then
-  echo "Error: config.env not found. Please run ./setup.sh first."
+  echo "Error: config.env not found. Please run ./01-setup.sh first."
   exit 1
 fi
 
