@@ -1,815 +1,549 @@
-# Google Cloud Platform - Task & Workflow Orchestration Demos
+# GCP Task & Workflow Orchestration Demos
 
-This repository contains comprehensive demos for 4 GCP services that handle task scheduling, event processing, and workflow orchestration.
+A comprehensive guide to **4 GCP services** for task scheduling, event processing, and workflow orchestration with hands-on demos.
 
-## Table of Contents
-- [Service Comparisons](#service-comparisons)
-- [Detailed Differences](#detailed-differences)
-- [Common Use Cases](#common-use-cases)
-- [Running the Demos](#running-the-demos)
-- [Prerequisites](#prerequisites)
+[![GCP](https://img.shields.io/badge/Google%20Cloud-4285F4?logo=google-cloud&logoColor=white)](https://cloud.google.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## Service Comparisons
+## 📚 Table of Contents
 
-### Quick Reference Table
-
-| Feature | Cloud Scheduler | Cloud Tasks | Eventarc | Workflows |
-|---------|----------------|-------------|----------|-----------|
-| **Primary Purpose** | Time-based scheduling | Async task queuing | Event routing | Service orchestration |
-| **Trigger Type** | Cron schedule | Programmatic API | Events (90+ sources) | Manual/scheduled/event |
-| **Execution Pattern** | Recurring or one-time | On-demand, queued | Event-driven | Multi-step sequences |
-| **Rate Control** | Schedule-based | Queue-level throttling | None (event-based) | Workflow-level |
-| **Retries** | Limited (3 attempts) | Configurable with backoff | Delivery retries | Built-in with backoff |
-| **Ordering** | N/A | FIFO optional | Best-effort | Sequential in workflow |
-| **State Management** | None | Task-level | None | Full workflow state |
-| **Cost Model** | Per job | Per task execution | Per event delivery | Per workflow step |
+- [Quick Start](#-quick-start)
+- [Service Overview](#-service-overview)
+- [Which Service Should I Use?](#-which-service-should-i-use)
+- [Demos](#-demos)
+- [Use Cases & Examples](#-use-cases--examples)
+- [Limits & Quotas](#-limits--quotas)
+- [Resources](#-resources)
 
 ---
 
-## Detailed Differences
+## 🚀 Quick Start
+
+### Prerequisites
+
+```bash
+# 1. Set your project
+export PROJECT_ID="your-project-id"
+gcloud config set project $PROJECT_ID
+
+# 2. Enable required APIs
+gcloud services enable \
+  cloudscheduler.googleapis.com \
+  cloudtasks.googleapis.com \
+  eventarc.googleapis.com \
+  workflows.googleapis.com \
+  cloudfunctions.googleapis.com \
+  run.googleapis.com
+
+# 3. Set region
+export REGION=us-central1
+```
+
+### Run a Demo
+
+Each demo is self-contained with setup, trigger, and cleanup scripts:
+
+```bash
+cd cloud-scheduler-demo
+./setup.sh      # Create resources
+./trigger.sh    # Test the service
+./cleanup.sh    # Remove everything
+```
+
+---
+
+## 🎯 Service Overview
+
+| Service | Purpose | Trigger | Best For |
+|---------|---------|---------|----------|
+| **🕐 Cloud Scheduler** | Cron jobs | Time-based | Periodic tasks (backups, reports) |
+| **📋 Cloud Tasks** | Task queuing | API call | Async work with retries (emails, processing) |
+| **🎯 Eventarc** | Event routing | Events (90+ sources) | Reacting to GCP events (file uploads, DB changes) |
+| **🔄 Workflows** | Service orchestration | Manual/scheduled/event | Multi-step processes (ETL, approvals) |
 
 ### 🕐 Cloud Scheduler
-**What it is**: A fully managed cron job service for GCP.
+> **"Run this every Monday at 9 AM"**
 
-**How it works**:
-- Define a schedule using cron syntax (e.g., `0 */6 * * *` for every 6 hours)
-- Configure a target (HTTP endpoint, Pub/Sub topic, or App Engine app)
-- Scheduler invokes the target at specified times
-- Limited retry mechanism (3 attempts with exponential backoff)
+- **What**: Fully managed cron job service
+- **When**: Time-based scheduling (hourly, daily, weekly, etc.)
+- **Example**: Generate daily reports, clean up old data, send weekly emails
 
-**Architecture**:
+```bash
+# Schedule a daily backup at 2 AM
+gcloud scheduler jobs create http daily-backup \
+  --schedule="0 2 * * *" \
+  --uri="https://myapp.com/backup"
 ```
-Cron Schedule → Cloud Scheduler → Target (HTTP/Pub/Sub/App Engine)
-```
-
-**Key Characteristics**:
-- **No state management**: Each execution is independent
-- **Time-driven**: Runs based on calendar/clock, not events
-- **Simple**: Best for straightforward periodic tasks
-- **Limited retries**: Not ideal for critical tasks requiring guaranteed delivery
-
----
 
 ### 📋 Cloud Tasks
-**What it is**: A fully managed task queue service for asynchronous workload distribution.
+> **"Do this in the background, retry if it fails"**
 
-**How it works**:
-- Create a task queue with rate limits and retry configuration
-- Programmatically add tasks to the queue (via API or SDK)
-- Tasks are delivered to HTTP endpoints (Cloud Functions, Cloud Run, etc.)
-- Advanced retry logic with configurable backoff
-- Rate limiting prevents overwhelming your services
+- **What**: Asynchronous task queue with rate limiting
+- **When**: Offload work from user requests, need guaranteed delivery
+- **Example**: Send emails, resize images, process payments
 
-**Architecture**:
-```
-Application → Cloud Tasks Queue → Worker (HTTP endpoint)
-                ↓
-         Rate Limiting
-         Retry Logic
-         Deduplication
-```
-
-**Key Characteristics**:
-- **Asynchronous**: Decouples task creation from execution
-- **Rate control**: Prevents overwhelming downstream services
-- **Reliable**: Guaranteed delivery with configurable retries
-- **Task-level configuration**: Each task can have custom retry/schedule settings
-- **Deduplication**: Prevents duplicate task execution
-
----
-
-### 🎯 Eventarc
-**What it is**: An event routing platform that delivers events from 90+ Google Cloud sources.
-
-**How it works**:
-- Events are generated by GCP services (e.g., Cloud Storage, BigQuery, Pub/Sub)
-- Eventarc routes these events to targets (Cloud Run, Cloud Functions, Workflows)
-- Uses CloudEvents standard format
-- Supports custom events via Pub/Sub
-- Filter events based on attributes
-
-**Architecture**:
-```
-Event Sources (90+) → Eventarc (Routing/Filtering) → Targets
-    ↓
-Cloud Storage
-BigQuery
-Pub/Sub         → Trigger Filters → Cloud Run
-Firestore                         → Cloud Functions
-Cloud Build                       → Workflows
-etc.
-```
-
-**Key Characteristics**:
-- **Event-driven**: Reacts to state changes in GCP services
-- **Decoupled**: Producers don't know about consumers
-- **Scalable**: Automatically handles event volume
-- **Standardized**: Uses CloudEvents format
-- **Flexible routing**: Multiple triggers can listen to same event source
-
----
-
-### 🔄 Workflows
-**What it is**: A serverless orchestration platform for defining multi-step processes.
-
-**How it works**:
-- Define workflows in YAML or JSON
-- Chain together GCP services, APIs, and connectors
-- Built-in error handling, retries, and conditional logic
-- Supports parallel execution, loops, and subworkflows
-- Maintains execution state throughout the workflow
-
-**Architecture**:
-```
-Trigger → Workflow Engine → Step 1 (API call)
-                          → Step 2 (Conditional)
-                          → Step 3a | Step 3b (Parallel)
-                          → Step 4 (Aggregation)
-                          → Final Result
-```
-
-**Key Characteristics**:
-- **Orchestration**: Coordinates multiple services in sequence or parallel
-- **Stateful**: Maintains workflow state and variables
-- **Complex logic**: Supports conditionals, loops, try-catch
-- **Visual**: Can be viewed in Cloud Console as flowchart
-- **Built-in integrations**: 100+ connectors to GCP and external services
-- **Long-running**: Can execute for up to 1 year
-
----
-
-## Common Use Cases
-
-### 🕐 Cloud Scheduler Use Cases
-
-1. **Regular Data Exports**
-   - Schedule daily database backups at 2 AM
-   - Export analytics data to BigQuery every hour
-   - Generate monthly reports on the 1st of each month
-
-2. **Maintenance Tasks**
-   - Clean up temporary files every 6 hours
-   - Refresh materialized views nightly
-   - Rotate logs weekly
-
-3. **Monitoring & Health Checks**
-   - Ping services every 5 minutes to check availability
-   - Run synthetic transactions hourly
-   - Send daily infrastructure cost reports
-
-4. **Batch Processing**
-   - Process overnight batch jobs
-   - Send scheduled email newsletters
-   - Update caches at specific times
-
-**Example**: Send a summary email every Monday at 9 AM
-```bash
-gcloud scheduler jobs create http weekly-summary \
-  --schedule="0 9 * * 1" \
-  --uri="https://myapp.com/send-summary" \
-  --http-method=POST
-```
-
----
-
-### 📋 Cloud Tasks Use Cases
-
-1. **User Request Offloading**
-   - Image/video processing after upload
-   - PDF generation triggered by user action
-   - Email sending without blocking API response
-
-2. **Rate-Limited API Calls**
-   - Calling third-party APIs with rate limits
-   - Bulk operations that need throttling
-   - Database migrations with controlled throughput
-
-3. **Reliable Background Jobs**
-   - Payment processing with retries
-   - Order fulfillment workflows
-   - Data synchronization between systems
-
-4. **Fan-out Processing**
-   - Send notifications to millions of users
-   - Process each row from a large dataset
-   - Distribute work across multiple workers
-
-**Example**: Process uploaded image asynchronously
 ```python
-from google.cloud import tasks_v2
-
-client = tasks_v2.CloudTasksClient()
+# Queue a task to process uploaded image
 task = {
     'http_request': {
-        'http_method': tasks_v2.HttpMethod.POST,
-        'url': 'https://worker.com/resize-image',
-        'headers': {'Content-Type': 'application/json'},
-        'body': json.dumps({'image_id': '12345'}).encode()
+        'http_method': 'POST',
+        'url': 'https://worker.com/resize',
+        'body': json.dumps({'image_id': '12345'})
     }
 }
 client.create_task(parent=queue_path, task=task)
 ```
 
----
+### 🎯 Eventarc
+> **"When this happens, do that"**
 
-### 🎯 Eventarc Use Cases
+- **What**: Event-driven architecture with 90+ event sources
+- **When**: React to GCP service changes (Storage uploads, DB updates, builds)
+- **Example**: Process files on upload, index on DB insert, deploy on build success
 
-1. **Storage Event Processing**
-   - Trigger image processing when file uploaded to Cloud Storage
-   - Start transcoding pipeline on video upload
-   - Index documents when added to bucket
-
-2. **Database Change Reactions**
-   - Send notification when Firestore document created
-   - Update search index on BigQuery table change
-   - Sync data when Cloud SQL row modified
-
-3. **CI/CD Integration**
-   - Deploy to staging when Cloud Build completes
-   - Run tests when code pushed to repository
-   - Notify team when build fails
-
-4. **Audit & Compliance**
-   - Log all resource modifications
-   - Alert on security policy changes
-   - Track data access patterns
-
-**Example**: Process files uploaded to Cloud Storage
 ```bash
+# Trigger Cloud Run when file uploaded to bucket
 gcloud eventarc triggers create storage-trigger \
   --destination-run-service=process-file \
-  --destination-run-region=us-central1 \
   --event-filters="type=google.cloud.storage.object.v1.finalized" \
-  --event-filters="bucket=my-upload-bucket"
+  --event-filters="bucket=my-bucket"
+```
+
+### 🔄 Workflows
+> **"Do step 1, then step 2, if that works do step 3..."**
+
+- **What**: Serverless orchestration with state management
+- **When**: Multi-step processes, complex logic, error handling
+- **Example**: Order processing, ETL pipelines, approval workflows
+
+```yaml
+# Multi-step order processing
+- validate: call: http.post
+- charge: call: payment_api
+- ship: call: shipping_api
+- notify: call: email_api
 ```
 
 ---
 
-### 🔄 Workflows Use Cases
+## 🤔 Which Service Should I Use?
 
-1. **Multi-Service Orchestration**
-   - Validate data → Transform → Load → Notify (ETL pipeline)
-   - Lookup user → Check permissions → Process request → Update records
-   - Multi-step approval workflows
+### Decision Tree
 
-2. **Error Handling & Retries**
-   - Call API with automatic retry on failure
-   - Fallback to alternative service if primary fails
-   - Compensating transactions on errors
+```
+Need to run on a schedule? 
+  ├─ Yes → Cloud Scheduler
+  └─ No ↓
 
-3. **Complex Business Logic**
-   - Order processing: validate → charge card → update inventory → ship
-   - Insurance claim processing with multiple decision points
-   - Multi-step data validation and enrichment
+Reacting to GCP events (storage, DB, builds)?
+  ├─ Yes → Eventarc
+  └─ No ↓
 
-4. **Parallel Processing**
-   - Call multiple APIs simultaneously
-   - Process multiple files in parallel
-   - Aggregate results from multiple sources
+Multiple steps with conditional logic?
+  ├─ Yes → Workflows
+  └─ No ↓
 
-5. **Human-in-the-Loop**
-   - Wait for approval before proceeding
-   - Escalation workflows with timeouts
-   - Multi-stage review processes
+Async task with retries and rate limiting?
+  └─ Yes → Cloud Tasks
+```
 
-**Example**: Multi-step order processing
+### Common Scenarios
+
+| Scenario | Solution |
+|----------|----------|
+| 📅 Daily database backup | **Cloud Scheduler** |
+| 📧 Send email after user signup | **Cloud Tasks** |
+| 🖼️ Resize image on upload | **Eventarc** + Cloud Functions |
+| 🛒 Multi-step order processing | **Workflows** |
+| 🔄 Sync data to 3rd party API (rate-limited) | **Cloud Tasks** |
+| 📊 Generate monthly reports | **Cloud Scheduler** + Workflows |
+| 🎬 Video transcoding pipeline | **Eventarc** + Workflows |
+
+### Quick Comparison
+
+#### ✅ Use Cloud Scheduler When:
+- Tasks run on a **fixed schedule** (every hour, daily, weekly)
+- Simple HTTP calls or Pub/Sub messages
+- Don't need complex retry logic
+
+#### ✅ Use Cloud Tasks When:
+- Offloading work from **user requests** (don't make users wait)
+- Need **guaranteed delivery** with retries
+- Must **rate-limit** API calls
+- Processing **independent tasks** at scale
+
+#### ✅ Use Eventarc When:
+- Reacting to **GCP service events** (Storage, Firestore, BigQuery)
+- Building **event-driven** architectures
+- Need **real-time** reactions (not polling)
+
+#### ✅ Use Workflows When:
+- **Multiple services** need coordination
+- Complex **conditional logic** required
+- Need **error handling** and compensation
+- **Long-running** processes (minutes to hours)
+
+---
+
+## 🧪 Demos
+
+Each demo includes complete setup, trigger, and cleanup scripts:
+
+### 1. [Cloud Scheduler Demo](./cloud-scheduler-demo/)
+**Schedule periodic HTTP calls**
+- Cron-based scheduling
+- HTTP endpoint invocation
+- Retry configuration
+
+### 2. [Cloud Tasks Demo](./cloud-tasks-demo/)
+**Queue background tasks**
+- Task queue creation
+- Rate-limited processing
+- Retry & deduplication
+
+### 3. [Eventarc Demo](./eventarc-demo/)
+**React to Cloud Storage events**
+- Event-driven triggers
+- Cloud Storage integration
+- Cloud Run deployment
+
+### 4. [Workflows Demo](./workflows-demo/)
+**Orchestrate multi-step processes**
+- Sequential & parallel execution
+- Error handling
+- API integration
+
+---
+
+## 💡 Use Cases & Examples
+
+<details>
+<summary><b>🕐 Cloud Scheduler Examples</b></summary>
+
+### ✅ Good Use Cases
+
+**1. Database Maintenance**
+```bash
+# Run VACUUM on PostgreSQL nightly
+gcloud scheduler jobs create http db-vacuum \
+  --schedule="0 2 * * *" \
+  --uri="https://db-admin.com/vacuum"
+```
+
+**2. Cache Warming**
+```bash
+# Refresh product catalog every hour
+gcloud scheduler jobs create http cache-refresh \
+  --schedule="0 * * * *" \
+  --uri="https://api.com/refresh-cache"
+```
+
+**3. Report Generation**
+```bash
+# Generate sales report every Monday at 9 AM
+gcloud scheduler jobs create http weekly-report \
+  --schedule="0 9 * * 1" \
+  --uri="https://reports.com/generate"
+```
+
+### ❌ Don't Use For
+
+- Reacting to events → Use **Eventarc**
+- Complex multi-step logic → Use **Workflows**
+- High-reliability tasks needing many retries → Use **Cloud Tasks**
+
+</details>
+
+<details>
+<summary><b>📋 Cloud Tasks Examples</b></summary>
+
+### ✅ Good Use Cases
+
+**1. Image Processing After Upload**
+```python
+# Don't make user wait for image resize
+def handle_upload(request):
+    image_id = save_to_storage(request.files['image'])
+    
+    # Queue background task
+    task = {
+        'http_request': {
+            'url': 'https://worker.com/resize',
+            'body': json.dumps({'image_id': image_id})
+        }
+    }
+    tasks_client.create_task(parent=queue, task=task)
+    
+    return {'status': 'uploaded', 'id': image_id}  # instant response
+```
+
+**2. Rate-Limited API Sync**
+```python
+# Sync 10,000 users to CRM at max 100/sec
+queue_config = {
+    'rate_limits': {
+        'max_dispatches_per_second': 100
+    }
+}
+
+for user in users:
+    task = create_sync_task(user)
+    tasks_client.create_task(parent=queue, task=task)
+```
+
+**3. Reliable Payment Processing**
+```python
+# Retry failed charges automatically
+queue_config = {
+    'retry_config': {
+        'max_attempts': 5,
+        'min_backoff': '10s',
+        'max_backoff': '300s'
+    }
+}
+```
+
+### ❌ Don't Use For
+
+- Time-based scheduling → Use **Cloud Scheduler**
+- Reacting to GCP events → Use **Eventarc**
+- Multi-step orchestration → Use **Workflows**
+
+</details>
+
+<details>
+<summary><b>🎯 Eventarc Examples</b></summary>
+
+### ✅ Good Use Cases
+
+**1. File Processing on Upload**
+```bash
+# Automatically process files uploaded to bucket
+gcloud eventarc triggers create file-processor \
+  --destination-run-service=process-file \
+  --event-filters="type=google.cloud.storage.object.v1.finalized" \
+  --event-filters="bucket=uploads"
+```
+
+**2. Deploy on Build Success**
+```bash
+# Auto-deploy when Cloud Build completes
+gcloud eventarc triggers create auto-deploy \
+  --destination-run-service=deployer \
+  --event-filters="type=google.cloud.cloudbuild.build.v1.StatusChanged" \
+  --event-filters="buildStatus=SUCCESS"
+```
+
+**3. Database Change Notifications**
+```bash
+# Send notification when Firestore document created
+gcloud eventarc triggers create new-order \
+  --destination-run-service=notifier \
+  --event-filters="type=google.cloud.firestore.document.v1.created" \
+  --event-filters="database=(default)"
+```
+
+### ❌ Don't Use For
+
+- Scheduled tasks → Use **Cloud Scheduler**
+- Rate-limited processing → Use **Cloud Tasks**
+- Complex workflows → Use **Workflows**
+
+</details>
+
+<details>
+<summary><b>🔄 Workflows Examples</b></summary>
+
+### ✅ Good Use Cases
+
+**1. Order Processing Pipeline**
 ```yaml
 - validate_order:
     call: http.post
     args:
-      url: https://api.example.com/validate
+      url: ${validate_url}
       body: ${order}
-    result: validation_result
-
-- check_validation:
-    switch:
-      - condition: ${validation_result.valid == true}
-        next: charge_payment
-      - condition: true
-        next: send_error_notification
+    result: validation
 
 - charge_payment:
     call: http.post
     args:
-      url: https://payments.example.com/charge
+      url: ${payment_url}
       body: ${order.payment}
-    result: payment_result
+    result: charge
 
 - update_inventory:
     call: http.post
     args:
-      url: https://inventory.example.com/reduce
+      url: ${inventory_url}
       body: ${order.items}
+
+- send_confirmation:
+    call: http.post
+    args:
+      url: ${email_url}
+      body: ${order.customer}
 ```
 
----
+**2. ETL with Error Handling**
+```yaml
+- extract:
+    try:
+      call: http.get
+      args:
+        url: ${source_api}
+      result: data
+    retry:
+      max_attempts: 3
+      backoff: exponential
 
-## Decision Guide: Which Service to Use?
+- transform:
+    call: http.post
+    args:
+      url: ${transform_service}
+      body: ${data}
+    result: transformed
 
-### 🕐 Cloud Scheduler
+- load:
+    call: http.post
+    args:
+      url: ${bigquery_api}
+      body: ${transformed}
+```
 
-**✅ Use When:**
+**3. Parallel Processing & Aggregation**
+```yaml
+- parallel_calls:
+    parallel:
+      shared: [results]
+      branches:
+        - call_api_1:
+            call: http.get
+            args:
+              url: ${api1}
+            result: results.api1
+        - call_api_2:
+            call: http.get
+            args:
+              url: ${api2}
+            result: results.api2
+        - call_api_3:
+            call: http.get
+            args:
+              url: ${api3}
+            result: results.api3
 
-1. **Database maintenance jobs**
-   - Example: Run `VACUUM` on PostgreSQL every night at 2 AM
-   - Why: Scheduled maintenance needs to happen at specific times
+- aggregate:
+    assign:
+      - combined: ${results.api1 + results.api2 + results.api3}
+```
 
-2. **Report generation**
-   - Example: Generate daily sales reports every morning at 9 AM
-   - Why: Reports are needed on a predictable schedule
+### ❌ Don't Use For
 
-3. **Cache warming**
-   - Example: Refresh product catalog cache every hour
-   - Why: Regular intervals ensure fresh data
+- Simple independent tasks → Use **Cloud Tasks**
+- High-frequency short tasks → Use **Cloud Functions**
+- Just reacting to events → Use **Eventarc** + Cloud Functions
 
-**❌ Don't Use When:**
-
-1. **You need to react to events** → Use **Eventarc** instead
-   - Example: Process file immediately when uploaded
-   - Why: Can't wait for next scheduled run; need immediate reaction
-
-2. **You need guaranteed delivery with retries** → Use **Cloud Tasks** instead
-   - Example: Critical payment processing
-   - Why: Scheduler has limited retry attempts (3 max)
-
-3. **You need to orchestrate multiple services** → Use **Workflows** instead
-   - Example: Multi-step approval process
-   - Why: Scheduler can't handle complex conditional logic
-
----
-
-### 📋 Cloud Tasks
-
-**✅ Use When:**
-
-1. **Offloading user-facing operations**
-   - Example: Send welcome email after user signs up (don't make user wait)
-   - Why: Improves response time; user gets instant feedback
-
-2. **Rate-limited API calls**
-   - Example: Sync 10,000 records to external CRM at 100 req/sec max
-   - Why: Queue automatically throttles to respect rate limits
-
-3. **Reliable background processing**
-   - Example: Process credit card charges with automatic retries
-   - Why: Tasks are retried with exponential backoff until success
-
-**❌ Don't Use When:**
-
-1. **Tasks need to run on a schedule** → Use **Cloud Scheduler** instead
-   - Example: Daily backup at 3 AM
-   - Why: Use cron for time-based triggers, not queuing
-
-2. **You need to react to GCP service events** → Use **Eventarc** instead
-   - Example: Resize image when uploaded to Cloud Storage
-   - Why: Direct event triggers are more efficient than polling
-
-3. **You need complex multi-step logic** → Use **Workflows** instead
-   - Example: Order processing (validate → charge → ship → notify)
-   - Why: Tasks execute independently; can't coordinate steps
+</details>
 
 ---
 
-### 🎯 Eventarc
-
-**✅ Use When:**
-
-1. **File upload processing**
-   - Example: Automatically generate thumbnails when images uploaded to bucket
-   - Why: Events trigger immediately on upload; no polling needed
-
-2. **Reacting to database changes**
-   - Example: Send notification when high-value order created in Firestore
-   - Why: Real-time reaction to data changes
-
-3. **CI/CD automation**
-   - Example: Deploy to production when Cloud Build succeeds
-   - Why: Event-driven pipeline is more reliable than polling
-
-**❌ Don't Use When:**
-
-1. **You need complex orchestration** → Use **Workflows** instead
-   - Example: Multi-step ETL with conditionals and error handling
-   - Why: Eventarc routes events but doesn't orchestrate workflows
-
-2. **Tasks need to run on schedule** → Use **Cloud Scheduler** instead
-   - Example: Generate monthly invoices on the 1st of each month
-   - Why: No event occurs; needs time-based trigger
-
-3. **You need rate limiting and controlled processing** → Use **Cloud Tasks** instead
-   - Example: Process 1 million events but limit to 100/sec
-   - Why: Eventarc delivers events as they occur; no rate control
-
----
-
-### 🔄 Workflows
-
-**✅ Use When:**
-
-1. **Multi-service orchestration**
-   - Example: User signup (create account → send email → provision resources → notify admin)
-   - Why: Coordinates multiple services with error handling
-
-2. **Complex business logic**
-   - Example: Insurance claim (validate → assess damages → approve/deny → settle → notify)
-   - Why: Supports conditionals, loops, and decision trees
-
-3. **Long-running processes with retries**
-   - Example: Data migration (extract → transform → validate → load with checkpoints)
-   - Why: Maintains state; retries failed steps without starting over
-
-**❌ Don't Use When:**
-
-1. **Tasks are simple and independent** → Use **Cloud Tasks** instead
-   - Example: Send 1000 individual emails
-   - Why: Overhead of workflow for simple tasks; use queue instead
-
-2. **You're reacting to single events** → Use **Eventarc** instead
-   - Example: Log audit trail when file deleted
-   - Why: Simple event-to-action; no orchestration needed
-
-3. **High-frequency, short-duration tasks** → Use **Cloud Functions** or **Cloud Tasks** instead
-   - Example: Process 10,000 requests/second with 10ms processing time
-   - Why: Workflow step overhead makes it unsuitable for high-frequency use
-
----
-
-## Real-World Scenario Examples
-
-### Scenario 1: E-commerce Order Processing
-
-**Wrong approach:** Use Cloud Scheduler to poll for new orders every minute
-- Why wrong: Wastes resources, delays order processing
-
-**Right approach:** 
-1. **Eventarc**: Trigger when order created in Firestore
-2. **Workflows**: Orchestrate validation → inventory → payment → shipping
-3. **Cloud Tasks**: Queue individual notification emails
-
----
-
-### Scenario 2: Video Transcoding Pipeline
-
-**Wrong approach:** Use Cloud Scheduler to check for new uploads every 5 minutes
-- Why wrong: Delays processing up to 5 minutes
-
-**Right approach:**
-1. **Eventarc**: Trigger immediately on video upload to Cloud Storage
-2. **Workflows**: Orchestrate transcode → generate thumbnails → update database
-3. **Cloud Tasks**: Queue notification emails (rate-limited)
-
----
-
-### Scenario 3: Monthly Report Generation
-
-**Wrong approach:** Use Eventarc waiting for some event to trigger reports
-- Why wrong: No event occurs; needs time-based trigger
-
-**Right approach:**
-1. **Cloud Scheduler**: Trigger on 1st of month at 2 AM
-2. **Workflows** (if needed): Orchestrate data collection → aggregation → formatting → distribution
-3. **Cloud Tasks** (alternative): Create individual report generation tasks if simple
-
----
-
-### Scenario 4: Customer Data Sync
-
-**Requirement:** Sync customer data to 3rd-party CRM (max 50 req/sec)
-
-**Wrong approach:** Use Workflows to make API calls in sequence
-- Why wrong: Too slow; workflows add overhead for simple task
-
-**Right approach:**
-1. **Eventarc**: Detect customer updates in Firestore
-2. **Cloud Tasks**: Queue sync tasks with rate limit of 50/sec
-3. Optionally trigger from **Cloud Scheduler** for periodic full syncs
-
----
-
-## Combining Services
-
-These services often work together:
-
-1. **Scheduler + Tasks**: Schedule a job that creates many tasks
-   ```
-   Cloud Scheduler (daily at 2am) → Creates 1000 tasks in Cloud Tasks → Workers process
-   ```
-
-2. **Eventarc + Workflows**: React to event by starting workflow
-   ```
-   File uploaded to Storage → Eventarc → Workflow (validate→process→store→notify)
-   ```
-
-3. **Tasks + Workflows**: Queue tasks that execute workflows
-   ```
-   Application → Cloud Tasks → Workflow execution
-   ```
-
-4. **Scheduler + Workflows**: Schedule workflow execution
-   ```
-   Cloud Scheduler (weekly) → Workflow (complex multi-step process)
-   ```
-
----
-
-## Running the Demos
-
-Each demo directory contains:
-- `setup.sh`: Creates necessary GCP resources
-- `trigger.sh`: Demonstrates the service in action
-- `cleanup.sh`: Removes all created resources
-- `README.md`: Specific instructions for that demo
-
-Navigate to each demo directory and follow its README.
-
----
-
-## Prerequisites
-
-Before running the demos, ensure you have:
-
-1. **GCP Project with billing enabled**
-2. **gcloud CLI installed and authenticated**
-   ```bash
-   gcloud auth login
-   gcloud config set project YOUR_PROJECT_ID
-   ```
-
-3. **Required APIs enabled**
-   ```bash
-   # Enable all required APIs
-   gcloud services enable \
-     cloudscheduler.googleapis.com \
-     cloudtasks.googleapis.com \
-     eventarc.googleapis.com \
-     workflows.googleapis.com \
-     cloudfunctions.googleapis.com \
-     cloudbuild.googleapis.com \
-     run.googleapis.com \
-     storage.googleapis.com
-   ```
-
-4. **Set environment variables**
-   ```bash
-   export PROJECT_ID=$(gcloud config get-value project)
-   export REGION=us-central1
-   ```
-
----
-
-## Demos
-
-1. [**Cloud Scheduler Demo**](./cloud-scheduler-demo/) - Schedule periodic tasks
-2. [**Cloud Tasks Demo**](./cloud-tasks-demo/) - Queue asynchronous tasks
-3. [**Eventarc Demo**](./eventarc-demo/) - React to Cloud Storage events
-4. [**Workflows Demo**](./workflows-demo/) - Orchestrate multi-step processes
-
----
-
-## Configuration Limits & Quotas
-
-Understanding the limits of each service helps you design systems that scale properly.
-
-📚 **Official Quota Documentation:**
-- [Cloud Scheduler Quotas](https://cloud.google.com/scheduler/quotas)
-- [Cloud Tasks Quotas](https://cloud.google.com/tasks/docs/quotas)
-- [Eventarc Quotas](https://cloud.google.com/eventarc/quotas)
-- [Workflows Quotas](https://cloud.google.com/workflows/quotas)
-
-### 🕐 Cloud Scheduler Limits
-
-📖 [Full quota documentation](https://cloud.google.com/scheduler/quotas)
-
-| Limit | Value |
-|-------|-------|
-| **Maximum jobs per project** | 100,000 per region |
-| **Maximum job name length** | 500 characters |
-| **Maximum schedule frequency** | Once per minute |
-| **Request timeout** | 30 minutes (HTTP), 10 minutes (Pub/Sub) |
-| **Maximum payload size** | 100 KB |
-| **Maximum retry attempts** | 3 attempts |
-| **Maximum backoff duration** | 3600 seconds (1 hour) |
-| **Maximum execution window** | 2 hours after scheduled time |
-| **Jobs that can run simultaneously** | Based on target service capacity |
-
-**Cron Expression Limits:**
-- Minimum interval: `* * * * *` (every minute)
-- Maximum specificity: Minute-level (no seconds)
-
----
-
-### 📋 Cloud Tasks Limits
-
-| Limit | Value |
-|-------|-------|
-| **Maximum queues per project** | 1,000 per location |
-| **Maximum tasks per queue** | 1,000,000 active or pending |
-| **Maximum queue name length** | 100 characters |
-| **Maximum task name length** | 500 characters |
-| **Maximum payload size** | 100 KB (HTTP), 1 MB (App Engine) |
-| **Maximum task age** | 31 days |
-| **Maximum dispatch rate** | 500 tasks/second per queue (configurable) |
-| **Maximum concurrent tasks** | 1,000 tasks per queue (configurable) |
-| **Maximum retry attempts** | Unlimited (configurable) |
-| **Maximum retry duration** | Unlimited (configurable) |
-| **Minimum backoff** | 0.1 seconds |
-| **Maximum backoff** | 3600 seconds (1 hour) |
-| **Task creation rate** | 500 tasks/second per queue |
-| **Maximum schedule delay** | 30 days in the future |
-
-**Rate Limiting Options:**
-- `max-dispatches-per-second`: 1 to 500
-- `max-concurrent-dispatches`: 1 to 1,000
-- `max-burst-size`: Calculated automatically
-
-**Retry Configuration:**
-- `max-attempts`: 0 to unlimited
-- `max-retry-duration`: 0 to unlimited
-- `min-backoff`: 0.1s to 3600s
-- `max-backoff`: 0.1s to 3600s
-- `max-doublings`: 0 to 16
-
----
-
-### 🎯 Eventarc Limits
-
-| Limit | Value |
-|-------|-------|
-| **Maximum triggers per location** | 200 per Google Cloud project |
-| **Maximum event size** | 512 KB (CloudEvents format) |
-| **Event delivery timeout** | 10 minutes |
-| **Maximum event filters per trigger** | 10 filters |
-| **Event retention** | Up to 7 days (retry period) |
-| **Maximum retry attempts** | Based on retry policy (up to 7 days) |
-| **Trigger name length** | 63 characters maximum |
-| **Maximum concurrent events** | Based on target service capacity |
-| **Event ordering** | Best-effort (at-least-once delivery) |
-
-**Delivery Guarantees:**
-- At-least-once delivery
-- No ordering guarantees
-- Automatic retries with exponential backoff
-- Dead letter topic support
-
-**Event Filter Limits:**
-- Maximum 10 attribute filters per trigger
-- Pattern matching support for path filters
-- Case-sensitive string matching
-
----
-
-### 🔄 Workflows Limits
-
-| Limit | Value |
-|-------|-------|
-| **Maximum workflows per project** | 1,000 per region |
-| **Maximum workflow definition size** | 1 MB (YAML or JSON) |
-| **Maximum workflow name length** | 63 characters |
-| **Maximum execution duration** | 1 year (configurable timeout) |
-| **Maximum concurrent executions** | 10,000 per workflow |
-| **Maximum steps per execution** | No hard limit (charged per step) |
-| **Maximum step duration** | 120 seconds per HTTP call |
-| **Maximum subworkflow depth** | 10 levels |
-| **Maximum parallel branches** | 100,000 branches |
-| **Maximum variables per execution** | No hard limit (limited by memory) |
-| **Maximum variable size** | 256 KB per variable |
-| **Maximum input/output size** | 256 KB |
-| **Execution history retention** | 30 days |
-| **Maximum execution creation rate** | 1,000 executions/second per workflow |
-
-**Step Limits:**
-- HTTP call timeout: 1,800 seconds (30 minutes)
-- Sleep duration: 1 year maximum
-- Retry attempts: Unlimited (configurable)
-- Backoff multiplier: 1.0 to 10.0
-- Maximum backoff: 1 year
-
-**Built-in Connectors:**
-- 100+ pre-built connectors
-- Custom HTTP calls supported
-- Authentication supported (OAuth, API keys, service accounts)
-
----
-
-## Quota Increases
-
-All services support quota increase requests:
-
-1. **Request via Cloud Console:**
-   - Navigate to: IAM & Admin → Quotas
-   - Filter by service name
-   - Select quota to increase
-   - Click "EDIT QUOTAS"
-
-2. **Typical Approval Time:** 2-5 business days
-
-3. **Common Increase Requests:**
-   - Cloud Scheduler: Jobs per region
-   - Cloud Tasks: Dispatch rate, concurrent tasks
-   - Eventarc: Triggers per location
-   - Workflows: Concurrent executions
-
----
-
-## Performance Considerations
+## 📊 Limits & Quotas
+
+### Quick Reference
+
+| Service | Key Limits | Request Increase |
+|---------|-----------|------------------|
+| **Cloud Scheduler** | 100K jobs/region, 3 retry attempts | [View Quotas](https://cloud.google.com/scheduler/quotas) |
+| **Cloud Tasks** | 1M tasks/queue, 500/sec dispatch | [View Quotas](https://cloud.google.com/tasks/docs/quotas) |
+| **Eventarc** | 200 triggers/location, 512KB events | [View Quotas](https://cloud.google.com/eventarc/quotas) |
+| **Workflows** | 1 year max duration, 1MB definition | [View Quotas](https://cloud.google.com/workflows/quotas) |
+
+<details>
+<summary><b>View Detailed Limits</b></summary>
 
 ### Cloud Scheduler
-- ⚡ **Latency**: Typically executes within 1 second of scheduled time
-- 📊 **Accuracy**: ±1 second for cron schedules
-- 🔄 **Reliability**: 99.9% execution success rate (when target is available)
+- Jobs per region: **100,000**
+- Min frequency: **1 minute**
+- Retry attempts: **3**
+- HTTP timeout: **30 minutes**
+- Payload size: **100 KB**
 
 ### Cloud Tasks
-- ⚡ **Latency**: <1 second from task creation to dispatch (when queue not rate-limited)
-- 📊 **Throughput**: Up to 500 tasks/second per queue
-- 🔄 **Reliability**: At-least-once delivery guarantee
+- Tasks per queue: **1,000,000**
+- Dispatch rate: **500/sec** (configurable)
+- Concurrent tasks: **1,000** (configurable)
+- Payload size: **100 KB** (HTTP), **1 MB** (App Engine)
+- Max task age: **31 days**
+- Retry duration: **Unlimited** (configurable)
 
 ### Eventarc
-- ⚡ **Latency**: Typically <1 second from event to delivery
-- 📊 **Scalability**: Automatically scales to handle event volume
-- 🔄 **Reliability**: At-least-once delivery with automatic retries
+- Triggers per location: **200**
+- Event size: **512 KB**
+- Delivery timeout: **10 minutes**
+- Filters per trigger: **10**
+- Event retention: **7 days**
 
 ### Workflows
-- ⚡ **Startup Latency**: ~200ms for first step
-- 📊 **Step Latency**: ~50-100ms overhead per step
-- 🔄 **Reliability**: Automatic state management and retry handling
+- Workflows per region: **1,000**
+- Definition size: **1 MB**
+- Max duration: **1 year**
+- Concurrent executions: **10,000**
+- Subworkflow depth: **10 levels**
+- Parallel branches: **100,000**
+
+</details>
 
 ---
 
-## Cost Considerations
+## 💰 Pricing
 
-- **Cloud Scheduler**: $0.10 per job per month (3 jobs free)
-- **Cloud Tasks**: First 1M operations free, then $0.40 per million
-- **Eventarc**: Channel usage charges, see [pricing](https://cloud.google.com/eventarc/pricing)
-- **Workflows**: First 5,000 steps free per month, then $0.01 per 1,000 steps
+| Service | Pricing Model | Free Tier |
+|---------|--------------|-----------|
+| **Cloud Scheduler** | $0.10/job/month | 3 jobs free |
+| **Cloud Tasks** | $0.40 per million operations | 1M operations/month free |
+| **Eventarc** | Channel usage charges | Varies by channel |
+| **Workflows** | $0.01 per 1,000 steps | 5,000 steps/month free |
+
+📖 Official pricing: [Scheduler](https://cloud.google.com/scheduler/pricing) • [Tasks](https://cloud.google.com/tasks/pricing) • [Eventarc](https://cloud.google.com/eventarc/pricing) • [Workflows](https://cloud.google.com/workflows/pricing)
 
 ---
 
-## Additional Resources
+## 🔗 Resources
 
 ### Official Documentation
 
-**Cloud Scheduler:**
-- [Overview](https://cloud.google.com/scheduler/docs)
-- [Quickstart](https://cloud.google.com/scheduler/docs/quickstart)
-- [Creating Jobs](https://cloud.google.com/scheduler/docs/creating)
-- [Configuring Cron Schedules](https://cloud.google.com/scheduler/docs/configuring/cron-job-schedules)
-- [API Reference](https://cloud.google.com/scheduler/docs/reference/rest)
-- [Pricing](https://cloud.google.com/scheduler/pricing)
+**Cloud Scheduler**
+- [📘 Overview](https://cloud.google.com/scheduler/docs) | [🚀 Quickstart](https://cloud.google.com/scheduler/docs/quickstart) | [📖 Cron Syntax](https://cloud.google.com/scheduler/docs/configuring/cron-job-schedules)
 
-**Cloud Tasks:**
-- [Overview](https://cloud.google.com/tasks/docs)
-- [Quickstart](https://cloud.google.com/tasks/docs/quickstart)
-- [Creating Queues](https://cloud.google.com/tasks/docs/creating-queues)
-- [Creating Tasks](https://cloud.google.com/tasks/docs/creating-http-target-tasks)
-- [Rate Limits & Retries](https://cloud.google.com/tasks/docs/configuring-queues)
-- [API Reference](https://cloud.google.com/tasks/docs/reference/rest)
-- [Pricing](https://cloud.google.com/tasks/pricing)
+**Cloud Tasks**
+- [📘 Overview](https://cloud.google.com/tasks/docs) | [🚀 Quickstart](https://cloud.google.com/tasks/docs/quickstart) | [⚙️ Queue Config](https://cloud.google.com/tasks/docs/configuring-queues)
 
-**Eventarc:**
-- [Overview](https://cloud.google.com/eventarc/docs)
-- [Quickstart](https://cloud.google.com/eventarc/docs/quickstart)
-- [Event Sources](https://cloud.google.com/eventarc/docs/event-providers-targets)
-- [CloudEvents Specification](https://cloudevents.io/)
-- [Creating Triggers](https://cloud.google.com/eventarc/docs/creating-triggers)
-- [Filtering Events](https://cloud.google.com/eventarc/docs/path-patterns)
-- [API Reference](https://cloud.google.com/eventarc/docs/reference/rest)
-- [Pricing](https://cloud.google.com/eventarc/pricing)
+**Eventarc**
+- [📘 Overview](https://cloud.google.com/eventarc/docs) | [🚀 Quickstart](https://cloud.google.com/eventarc/docs/quickstart) | [🎯 Event Sources](https://cloud.google.com/eventarc/docs/event-providers-targets)
 
-**Workflows:**
-- [Overview](https://cloud.google.com/workflows/docs)
-- [Quickstart](https://cloud.google.com/workflows/docs/quickstart-console)
-- [Workflow Syntax](https://cloud.google.com/workflows/docs/reference/syntax)
-- [Standard Library Reference](https://cloud.google.com/workflows/docs/reference/stdlib/overview)
-- [Connectors](https://cloud.google.com/workflows/docs/reference/googleapis)
-- [Error Handling](https://cloud.google.com/workflows/docs/reference/syntax/catching-errors)
-- [API Reference](https://cloud.google.com/workflows/docs/reference/rest)
-- [Pricing](https://cloud.google.com/workflows/pricing)
-
-### Tutorials & Guides
-
-- [Building Event-Driven Architectures](https://cloud.google.com/eventarc/docs/event-driven-architectures)
-- [Orchestrating Multi-Step Workflows](https://cloud.google.com/workflows/docs/tutorials)
-- [Managing Background Tasks](https://cloud.google.com/tasks/docs/tutorial-gcf)
-- [Scheduling Recurring Jobs](https://cloud.google.com/scheduler/docs/tut-pub-sub)
-
-### Best Practices
-
-- [Cloud Scheduler Best Practices](https://cloud.google.com/scheduler/docs/best-practices)
-- [Cloud Tasks Best Practices](https://cloud.google.com/tasks/docs/best-practices)
-- [Eventarc Best Practices](https://cloud.google.com/eventarc/docs/best-practices)
-- [Workflows Best Practices](https://cloud.google.com/workflows/docs/best-practices)
+**Workflows**
+- [📘 Overview](https://cloud.google.com/workflows/docs) | [🚀 Quickstart](https://cloud.google.com/workflows/docs/quickstart-console) | [📝 Syntax Reference](https://cloud.google.com/workflows/docs/reference/syntax)
 
 ### Related Services
-
 - [Cloud Functions](https://cloud.google.com/functions/docs) - Execute code in response to events
-- [Cloud Run](https://cloud.google.com/run/docs) - Run containers in a fully managed environment
-- [Pub/Sub](https://cloud.google.com/pubsub/docs) - Messaging and event streaming
-- [Cloud Build](https://cloud.google.com/build/docs) - Continuous integration and delivery
+- [Cloud Run](https://cloud.google.com/run/docs) - Run containers serverless
+- [Pub/Sub](https://cloud.google.com/pubsub/docs) - Messaging and streaming
 
 ---
 
-## License
+## 📝 License
 
-MIT License - Feel free to use these demos for learning and development.
+[MIT License](LICENSE) - Feel free to use these demos for learning and development.
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests welcome! Help improve these demos for the community.
+
+---
+
+**Made with ☁️ by the community**
