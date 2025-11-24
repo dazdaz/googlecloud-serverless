@@ -275,7 +275,7 @@ gcloud container binauthz policy export
 
 - [Binary Authorization Overview](https://cloud.google.com/binary-authorization/docs/overview)
 - [Using Binary Authorization with Cloud Run](https://cloud.google.com/run/docs/securing/binary-authorization)
-- [Creating Attestations](https://cloud.google.com/binary-authorization/docs/creating-attestations)
+- [Creating Attestations](https://docs.cloud.google.com/binary-authorization/docs/making-attestations)
 - [Policy Reference](https://cloud.google.com/binary-authorization/docs/policy-yaml-reference)
 
 ### Related Topics
