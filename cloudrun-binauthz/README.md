@@ -163,7 +163,7 @@ Before deploying to Cloud Run, Binary Authorization:
 
 ### Binary Authorization Policy
 
-The policy (`01-setup.sh` line 159) requires attestations:
+The policy (`setup.sh` line 159) requires attestations:
 
 ```yaml
 defaultAdmissionRule:
@@ -273,9 +273,9 @@ gcloud container binauthz policy export
 
 ### Official Documentation
 
-- [Binary Authorization Overview](https://cloud.google.com/binary-authorization/docs)
-- [Using Binary Authorization with Cloud Run](https://cloud.google.com/run/docs/binary-authorization)
-- [Creating Attestations](https://cloud.google.com/binary-authorization/docs/creating-attestations-kms)
+- [Binary Authorization Overview](https://cloud.google.com/binary-authorization/docs/overview)
+- [Using Binary Authorization with Cloud Run](https://cloud.google.com/run/docs/securing/binary-authorization)
+- [Creating Attestations](https://cloud.google.com/binary-authorization/docs/creating-attestations)
 - [Policy Reference](https://cloud.google.com/binary-authorization/docs/policy-yaml-reference)
 
 ### Related Topics
